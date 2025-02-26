@@ -3,7 +3,7 @@ import { Controller, Post, Body, Get, UseGuards, Req, HttpCode, HttpStatus, Quer
 import { AuthService } from './auth.service';
 import { GithubLoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { AuthResponse } from './interface/github-user.interface';
+import { AuthResponse } from './interfaces/github-user.interface';
 import { Response } from 'express';
 
 @Controller('auth')
