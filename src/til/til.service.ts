@@ -17,7 +17,7 @@ export class TilService {
     private readonly configService: ConfigService,
   ) {
     this.llmApiUrl = this.configService.get<string>('LLM_API_URL') || 'http://llm-server:5000/api/v1';
-    this.llmApiKey = this.configService.get<string>('LLM_API_KEY') || '';
+    this.llmApiKey = this.configService.get<string>('LLM_API_KEY') || ''; // 유니스한테 키 받아오기!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   }
 
   /**
@@ -29,7 +29,6 @@ export class TilService {
         `${this.llmApiUrl}/summation`,
         {
           ...convertTilDto,
-          user_id: user.id, // 사용자 식별자 추가
         },
         {
           headers: {
@@ -54,7 +53,6 @@ export class TilService {
         `${this.llmApiUrl}/enhance`,
         {
           ...enhanceTilDto,
-          user_id: user.id, // 사용자 식별자 추가
         },
         {
           headers: {
