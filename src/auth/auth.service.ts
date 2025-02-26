@@ -3,10 +3,21 @@ import { Injectable, UnauthorizedException, BadRequestException, InternalServerE
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Octokit } from 'octokit';
-import { GithubUser, AuthResponse, AuthUserData } from './interface/github-user.interface';
+import { GithubUser, AuthResponse, AuthUserData } from './interfaces/github-user.interface';
+
+// 메모리에 토큰을 저장하기 위한 인터페이스
+interface TokenStore {
+  [userId: number]: {
+    githubToken: string;
+    expiresAt: Date;
+  };
+}
 
 @Injectable()
 export class AuthService {
+  // 메모리 내 토큰 저장소
+  private tokenStore: TokenStore = {};
+  
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
@@ -38,6 +49,9 @@ export class AuthService {
         email: githubUser.email || `${githubUser.login}@github.com`, // 이메일이 없을 경우 대체값
         avatar_url: githubUser.avatar_url,
       };
+
+      // GitHub 토큰을 메모리에 저장 (사용자 ID를 키로 사용)
+      this.storeGithubToken(githubUser.id, githubToken);
 
       // JWT 토큰 생성
       const access_token = this.generateJwtToken(user);
@@ -204,5 +218,54 @@ export class AuthService {
         redirectUrl: `${frontendUrl}${loginErrorPath}?error=${errorMessage}`,
       };
     }
+  }
+
+  /**
+   * 사용자의 GitHub 액세스 토큰을 메모리에 저장
+   * @param userId GitHub 사용자 ID
+   * @param token GitHub 액세스 토큰
+   */
+  private storeGithubToken(userId: number, token: string): void {
+    // 현재 시간에 7일을 더한 만료 시간 계산 (일반적인 GitHub 토큰 만료 기간)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    
+    // 토큰 저장
+    this.tokenStore[userId] = {
+      githubToken: token,
+      expiresAt: expiresAt
+    };
+    
+    console.log(`GitHub 토큰이 저장되었습니다. 사용자 ID: ${userId}`);
+  }
+  
+  /**
+   * 사용자의 GitHub 액세스 토큰 조회
+   * @param userId GitHub 사용자 ID
+   * @returns GitHub 액세스 토큰 또는 null
+   */
+  public getGithubToken(userId: number): string | null {
+    const tokenData = this.tokenStore[userId];
+    
+    // 토큰이 없거나 만료된 경우
+    if (!tokenData || new Date() > tokenData.expiresAt) {
+      if (tokenData) {
+        // 만료된 토큰 삭제
+        delete this.tokenStore[userId];
+        console.log(`토큰이 만료되었습니다. 사용자 ID: ${userId}`);
+      }
+      return null;
+    }
+    
+    return tokenData.githubToken;
+  }
+  
+  /**
+   * GitHub 토큰 유효성 검사
+   * @param userId GitHub 사용자 ID
+   * @returns 토큰 유효 여부
+   */
+  public hasValidGithubToken(userId: number): boolean {
+    return this.getGithubToken(userId) !== null;
   }
 }
