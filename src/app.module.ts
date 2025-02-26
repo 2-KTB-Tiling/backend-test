@@ -14,6 +14,7 @@ import { GithubModule } from './github/github.module';
     AuthModule,
     GithubModule,
     TilModule,
+
     // NotionModule,
   ],
   controllers: [AppController], // 이 부분 추가
