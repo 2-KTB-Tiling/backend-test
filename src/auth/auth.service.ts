@@ -259,6 +259,11 @@ export class AuthService {
     
     return tokenData.githubToken;
   }
+
+  // github.service.ts에서 사용하는 디버깅 메서드
+  public debugTokenStore(): void {
+    console.log('현재 토큰 저장소 상태:', JSON.stringify(this.tokenStore, null, 2));
+  }
   
   /**
    * GitHub 토큰 유효성 검사
@@ -268,4 +273,5 @@ export class AuthService {
   public hasValidGithubToken(userId: number): boolean {
     return this.getGithubToken(userId) !== null;
   }
+  
 }

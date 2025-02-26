@@ -1,8 +1,9 @@
 // src/github/github.service.ts
-import { Injectable, BadRequestException, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Octokit } from 'octokit';
 import { AuthService } from '../auth/auth.service';
 import { Repository, RepositoryStore } from './interfaces/repository.interface';
+import { createDateBasedPath, createDateBasedFilename, createFullDateBasedPath } from '../common/utils/date-path.utils';
 
 @Injectable()
 export class GithubService {
@@ -37,12 +38,19 @@ export class GithubService {
 
       // owner와 repo 추출
       const owner = pathSegments[0];
-      const repo = pathSegments[1];
+      let repo = pathSegments[1];
+
+      // .git 확장자 제거
+      if (repo.endsWith('.git')) {
+        repo = repo.slice(0, -4); // '.git' 부분 제거
+      }
 
       // 유효성 추가 검사
       if (!owner || !repo) {
         throw new BadRequestException('GitHub URL에서 소유자나 레포지토리 이름을 추출할 수 없습니다.', 'invalid_repository_url');
       }
+
+      
 
       return { owner, repo };
     } catch (error) {
@@ -171,6 +179,193 @@ export class GithubService {
         'GitHub 파일 업로드 중 오류가 발생했습니다.',
         'github_upload_error'
       );
+    }
+  }
+   /**
+   * Markdown 파일을 GitHub 저장소에 현재 날짜 기반 경로로 업로드
+   * @param userId 사용자 ID
+   * @param content Markdown 내용
+   * @param customPath 사용자 정의 경로 (옵션)
+   * @param commitMessage 커밋 메시지
+   * @returns 업로드된 파일의 GitHub URL
+   */
+   async uploadMarkdownToDatePath(
+    userId: number,
+    content: string,
+    customPath?: string,
+    commitMessage: string = 'Add TIL via TIL Converter'
+  ): Promise<{ url: string }> {
+    console.log('업로드 요청 - 사용자 ID:', userId);
+    // 토큰 저장소 상태 디버깅 (auth.service.ts에 추가했다고 가정)
+    this.authService.debugTokenStore();
+
+    // 1. GitHub 토큰 가져오기
+    const githubToken = this.authService.getGithubToken(userId);
+
+
+    if (!githubToken) {
+      throw new UnauthorizedException(
+        '유효한 GitHub 토큰이 없습니다. 다시 로그인해주세요.',
+        'github_token_missing'
+      );
+    }
+
+    // 2. 레포지토리 정보 가져오기
+    const repository = this.getRepositoryInfo(userId);
+    if (!repository) {
+      throw new BadRequestException(
+        '등록된 GitHub 레포지토리가 없습니다. 먼저 레포지토리 URL을 등록해주세요.',
+        'repository_not_found'
+      );
+    }
+
+    try {
+      // 3. Octokit 인스턴스 생성
+      const octokit = new Octokit({ auth: githubToken });
+      
+      // 4. 경로 생성 (현재 날짜 기준 또는 사용자 지정)
+      const date = new Date();
+      const filePath = customPath || createFullDateBasedPath(date);
+      
+      // 5. 파일 내용 Base64 인코딩
+      const contentEncoded = Buffer.from(content).toString('base64');
+      
+      // 6. 디렉토리 구조 확인 및 생성 (필요한 경우)
+      await this.ensureDirectoryExists(
+        octokit, 
+        repository.owner, 
+        repository.repo, 
+        createDateBasedPath(date)
+      );
+
+      // 7. 파일 존재 여부 확인 (업데이트 시 필요)
+      let sha: string | undefined;
+      try {
+        const { data: existingFile } = await octokit.rest.repos.getContent({
+          owner: repository.owner,
+          repo: repository.repo,
+          path: filePath,
+        });
+
+        // 단일 파일인 경우에만 sha 추출
+        if (!Array.isArray(existingFile)) {
+          sha = existingFile.sha;
+        }
+      } catch (error) {
+        // 파일이 없는 경우 무시 (새 파일로 생성)
+        if (error.status !== 404) {
+          throw error;
+        }
+      }
+
+      // 8. 파일 생성 또는 업데이트
+      const response = await octokit.rest.repos.createOrUpdateFileContents({
+        owner: repository.owner,
+        repo: repository.repo,
+        path: filePath,
+        message: commitMessage,
+        content: contentEncoded,
+        sha, // 파일 업데이트 시 필요
+      });
+
+      // 9. 생성된 파일의 HTML URL 반환
+      const fileUrl = `https://github.com/${repository.owner}/${repository.repo}/blob/main/${filePath}`;
+      return { url: fileUrl };
+    } catch (error) {
+      console.error('GitHub 파일 업로드 오류:', error);
+      
+      if (error instanceof UnauthorizedException || 
+          error instanceof BadRequestException || 
+          error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      if (error.status === 404) {
+        throw new BadRequestException(
+          '저장소를 찾을 수 없습니다. 저장소 이름을 확인해주세요.',
+          'repository_not_found'
+        );
+      }
+      
+      if (error.message && error.message.includes('Bad credentials')) {
+        throw new UnauthorizedException(
+          'GitHub 인증 오류. 다시 로그인해주세요.',
+          'github_token_invalid'
+        );
+      }
+      
+      throw new InternalServerErrorException(
+        'GitHub 파일 업로드 중 오류가 발생했습니다.',
+        'github_upload_error'
+      );
+    }
+    
+  }
+
+  /**
+   * GitHub 저장소에 디렉토리 구조가 존재하는지 확인하고, 없으면 생성
+   * @param octokit Octokit 인스턴스
+   * @param owner 저장소 소유자
+   * @param repo 저장소 이름
+   * @param dirPath 확인할 디렉토리 경로 (예: '2023/Jan/')
+   */
+  private async ensureDirectoryExists(
+    octokit: Octokit,
+    owner: string, 
+    repo: string, 
+    dirPath: string
+  ): Promise<void> {
+    // 경로 끝의 슬래시 제거
+    dirPath = dirPath.replace(/\/+$/, '');
+    console.log('디렉토리 확인/생성:', { owner, repo, dirPath });
+    
+    // 경로를 세그먼트로 분리
+    const segments = dirPath.split('/').filter(segment => segment.length > 0);
+    let currentPath = '';
+    
+    // 각 세그먼트별로 디렉토리 존재 여부 확인 및 생성
+    for (const segment of segments) {
+      currentPath += segment;
+      
+      try {
+        // 디렉토리 존재 여부 확인
+        await octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path: currentPath,
+        });
+        // 디렉토리가 존재하면 다음 세그먼트로 진행
+      } catch (error) {
+        // 404 오류면 디렉토리가 없는 것이므로 생성
+        if (error.status === 404) {
+          try {
+            console.log(`디렉토리 생성: ${currentPath}`);
+            await octokit.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path: `${currentPath}/.gitkeep`,
+              message: `Create directory ${currentPath}`,
+              content: Buffer.from('').toString('base64'),
+            });
+          } catch (createError) {
+            console.error(`디렉토리 생성 오류: ${currentPath}`, {
+              status: createError.status,
+              message: createError.message
+            });
+            throw createError;
+          }
+        } else {
+          // 다른 오류라면 그대로 던지기
+          console.error(`디렉토리 확인 오류: ${currentPath}`, {
+            status: error.status,
+            message: error.message
+          });
+          throw error;
+        }
+      }
+      
+      // 다음 세그먼트로 이동하기 전에 슬래시 추가
+      currentPath += '/';
     }
   }
 }

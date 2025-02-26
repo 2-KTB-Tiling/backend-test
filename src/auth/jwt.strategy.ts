@@ -20,6 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // JWT 페이로드에서 사용자 정보 추출
     const user = {
       id: payload.sub,
+      sub: payload.sub,
       github_id: payload.github_id,
       email: payload.email,
     };
