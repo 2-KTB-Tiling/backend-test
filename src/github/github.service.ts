@@ -4,12 +4,6 @@ import { AuthService } from '../auth/auth.service';
 import { Repository, RepositoryStore } from './interfaces/repository.interface';
 import { createDateBasedPath, createDateBasedFilename, createFullDateBasedPath } from '../common/utils/date-path.utils';
 
-// Octokit 동적 import 함수
-async function getOctokitInstance(authToken: string) {
-  const { Octokit } = await import('octokit');
-  return new Octokit({ auth: authToken });
-}
-
 @Injectable()
 export class GithubService {
   // 사용자 ID를 키로 사용하여 레포지토리 정보를 메모리에 저장
@@ -54,8 +48,6 @@ export class GithubService {
       if (!owner || !repo) {
         throw new BadRequestException('GitHub URL에서 소유자나 레포지토리 이름을 추출할 수 없습니다.', 'invalid_repository_url');
       }
-
-      
 
       return { owner, repo };
     } catch (error) {
@@ -120,24 +112,25 @@ export class GithubService {
     }
 
     try {
-      // 3. Octokit 인스턴스 생성 (동적 import 사용)
-      const octokit = await getOctokitInstance(githubToken);
-
       // 4. 파일 내용 Base64 인코딩
       const contentEncoded = Buffer.from(content).toString('base64');
 
       // 5. 파일 존재 여부 확인 (에러 처리를 위함)
       let sha: string | undefined;
       try {
-        const { data: existingFile } = await octokit.rest.repos.getContent({
-          owner: repository.owner,
-          repo: repository.repo,
-          path,
+        const response = await fetch(`https://api.github.com/repos/${repository.owner}/${repository.repo}/contents/${path}`, {
+          method: 'GET',
+          headers: this.getGitHubHeaders(githubToken)
         });
 
-        // 단일 파일인 경우에만 sha 추출
-        if (!Array.isArray(existingFile)) {
-          sha = existingFile.sha;
+        if (response.ok) {
+          const data = await response.json();
+          // 단일 파일인 경우에만 sha 추출
+          if (!Array.isArray(data)) {
+            sha = data.sha;
+          }
+        } else if (response.status !== 404) {
+          throw new Error(`GitHub API 오류: ${response.status} ${response.statusText}`);
         }
       } catch (error) {
         // 파일이 없는 경우 무시 (새 파일로 생성)
@@ -147,14 +140,20 @@ export class GithubService {
       }
 
       // 6. 파일 생성 또는 업데이트
-      const response = await octokit.rest.repos.createOrUpdateFileContents({
-        owner: repository.owner,
-        repo: repository.repo,
-        path,
-        message: commitMessage,
-        content: contentEncoded,
-        sha, // 파일 업데이트 시 필요
+      const createResponse = await fetch(`https://api.github.com/repos/${repository.owner}/${repository.repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: this.getGitHubHeaders(githubToken),
+        body: JSON.stringify({
+          message: commitMessage,
+          content: contentEncoded,
+          sha // 파일 업데이트 시 필요
+        })
       });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        throw new Error(`GitHub API 오류: ${createResponse.status} ${JSON.stringify(errorData)}`);
+      }
 
       // 7. 생성된 파일의 HTML URL 반환
       const fileUrl = `https://github.com/${repository.owner}/${repository.repo}/blob/main/${path}`;
@@ -173,7 +172,7 @@ export class GithubService {
         );
       }
       
-      if (error.message.includes('Bad credentials')) {
+      if (error.message && error.message.includes('Bad credentials')) {
         throw new UnauthorizedException(
           'GitHub 인증 오류. 다시 로그인해주세요.',
           'github_token_invalid'
@@ -186,7 +185,8 @@ export class GithubService {
       );
     }
   }
-   /**
+
+  /**
    * Markdown 파일을 GitHub 저장소에 현재 날짜 기반 경로로 업로드
    * @param userId 사용자 ID
    * @param content Markdown 내용
@@ -194,27 +194,24 @@ export class GithubService {
    * @param commitMessage 커밋 메시지
    * @returns 업로드된 파일의 GitHub URL
    */
-   async uploadMarkdownToDatePath(
+  async uploadMarkdownToDatePath(
     userId: number,
     content: string,
     customPath?: string,
     commitMessage: string = 'Add TIL via TIL Converter'
   ): Promise<{ url: string }> {
     console.log('업로드 요청 - 사용자 ID:', userId);
-    // 토큰 저장소 상태 디버깅
     this.authService.debugTokenStore();
     
     // 1. GitHub 토큰 가져오기
     const githubToken = this.authService.getGithubToken(userId);
-
-
     if (!githubToken) {
       throw new UnauthorizedException(
         '유효한 GitHub 토큰이 없습니다. 다시 로그인해주세요.',
         'github_token_missing'
       );
     }
-
+  
     // 2. 레포지토리 정보 가져오기
     const repository = this.getRepositoryInfo(userId);
     if (!repository) {
@@ -223,57 +220,57 @@ export class GithubService {
         'repository_not_found'
       );
     }
-
+  
     try {
-      // 3. Octokit 인스턴스 생성 (동적 import 사용)
-      const octokit = await getOctokitInstance(githubToken);
-      
-      // 4. 경로 생성 (현재 날짜 기준 또는 사용자 지정)
+      // 3. 경로 생성 (현재 날짜 기준 또는 사용자 지정)
       const date = new Date();
       const filePath = customPath || createFullDateBasedPath(date);
       
-      // 5. 파일 내용 Base64 인코딩
+      // 4. 파일 내용 Base64 인코딩
       const contentEncoded = Buffer.from(content).toString('base64');
       
-      // 6. 디렉토리 구조 확인 및 생성 (필요한 경우)
-      await this.ensureDirectoryExists(
-        octokit, 
-        repository.owner, 
-        repository.repo, 
-        createDateBasedPath(date)
-      );
-
-      // 7. 파일 존재 여부 확인 (업데이트 시 필요)
+      // 5. 디렉토리 생성 로직 제거
+      // 이 부분을 제거: await this.ensureDirectoryExists(...);
+      
+      // 6. 파일 존재 여부 확인 (업데이트 시 필요)
       let sha: string | undefined;
       try {
-        const { data: existingFile } = await octokit.rest.repos.getContent({
-          owner: repository.owner,
-          repo: repository.repo,
-          path: filePath,
+        const response = await fetch(`https://api.github.com/repos/${repository.owner}/${repository.repo}/contents/${filePath}`, {
+          method: 'GET',
+          headers: this.getGitHubHeaders(githubToken)
         });
-
-        // 단일 파일인 경우에만 sha 추출
-        if (!Array.isArray(existingFile)) {
-          sha = existingFile.sha;
+  
+        if (response.ok) {
+          const data = await response.json();
+          if (!Array.isArray(data)) {
+            sha = data.sha;
+          }
         }
       } catch (error) {
         // 파일이 없는 경우 무시 (새 파일로 생성)
-        if (error.status !== 404) {
-          throw error;
-        }
+        console.log('파일이 없어 새로 생성합니다.');
       }
-
-      // 8. 파일 생성 또는 업데이트
-      const response = await octokit.rest.repos.createOrUpdateFileContents({
-        owner: repository.owner,
-        repo: repository.repo,
-        path: filePath,
-        message: commitMessage,
-        content: contentEncoded,
-        sha, // 파일 업데이트 시 필요
+  
+      // 7. 파일 생성 또는 업데이트
+      console.log(`파일 생성/업데이트 시작: ${filePath}`);
+      const createResponse = await fetch(`https://api.github.com/repos/${repository.owner}/${repository.repo}/contents/${filePath}`, {
+        method: 'PUT',
+        headers: this.getGitHubHeaders(githubToken),
+        body: JSON.stringify({
+          message: commitMessage,
+          content: contentEncoded,
+          sha,
+          branch: 'main'  // 명시적으로 브랜치 지정
+        })
       });
-
-      // 9. 생성된 파일의 HTML URL 반환
+  
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        console.error('파일 생성 오류 응답:', errorData);
+        throw new Error(`GitHub API 오류: ${createResponse.status} ${JSON.stringify(errorData)}`);
+      }
+  
+      // 8. 생성된 파일의 HTML URL 반환
       const fileUrl = `https://github.com/${repository.owner}/${repository.repo}/blob/main/${filePath}`;
       return { url: fileUrl };
     } catch (error) {
@@ -304,18 +301,31 @@ export class GithubService {
         'github_upload_error'
       );
     }
-    
+  }
+
+  /**
+   * GitHub API 요청에 필요한 헤더를 생성합니다.
+   * @param token GitHub 토큰
+   * @returns HTTP 헤더
+   */
+  private getGitHubHeaders(token: string): HeadersInit {
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'Tiling-App'
+    };
   }
 
   /**
    * GitHub 저장소에 디렉토리 구조가 존재하는지 확인하고, 없으면 생성
-   * @param octokit Octokit 인스턴스
+   * @param token GitHub 토큰
    * @param owner 저장소 소유자
    * @param repo 저장소 이름
    * @param dirPath 확인할 디렉토리 경로 (예: '2023/Jan/')
    */
   private async ensureDirectoryExists(
-    octokit: any, // Octokit 타입을 any로 변경
+    token: string, 
     owner: string, 
     repo: string, 
     dirPath: string
@@ -334,39 +344,45 @@ export class GithubService {
       
       try {
         // 디렉토리 존재 여부 확인
-        await octokit.rest.repos.getContent({
-          owner,
-          repo,
-          path: currentPath,
+        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}`, {
+          method: 'GET',
+          headers: this.getGitHubHeaders(token)
         });
+  
         // 디렉토리가 존재하면 다음 세그먼트로 진행
-      } catch (error) {
+        if (response.ok) {
+          currentPath += '/';
+          continue;
+        }
+        
         // 404 오류면 디렉토리가 없는 것이므로 생성
-        if (error.status === 404) {
-          try {
-            console.log(`디렉토리 생성: ${currentPath}`);
-            await octokit.rest.repos.createOrUpdateFileContents({
-              owner,
-              repo,
-              path: `${currentPath}/.gitkeep`,
+        if (response.status === 404) {
+          console.log(`디렉토리 생성: ${currentPath}`);
+          
+          // 빈 .gitkeep 파일 생성을 통해 디렉토리 생성
+          const createResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}/.gitkeep`, {
+            method: 'PUT',
+            headers: this.getGitHubHeaders(token),
+            body: JSON.stringify({
               message: `Create directory ${currentPath}`,
-              content: Buffer.from('').toString('base64'),
-            });
-          } catch (createError) {
-            console.error(`디렉토리 생성 오류: ${currentPath}`, {
-              status: createError.status,
-              message: createError.message
-            });
-            throw createError;
+              content: 'Cg==', // 빈 파일 내용(Base64 인코딩)
+              branch: 'main' // 명시적으로 브랜치 지정
+            })
+          });
+  
+          if (!createResponse.ok) {
+            const errorData = await createResponse.json();
+            console.error(`디렉토리 생성 응답:`, errorData);
+            throw new Error(`디렉토리 생성 오류: ${createResponse.status} ${JSON.stringify(errorData)}`);
           }
         } else {
-          // 다른 오류라면 그대로 던지기
-          console.error(`디렉토리 확인 오류: ${currentPath}`, {
-            status: error.status,
-            message: error.message
-          });
-          throw error;
+          // 다른 HTTP 오류
+          const errorData = await response.json();
+          throw new Error(`GitHub API 오류: ${response.status} ${JSON.stringify(errorData)}`);
         }
+      } catch (error) {
+        console.error(`디렉토리 작업 오류: ${currentPath}`, error);
+        throw error;
       }
       
       // 다음 세그먼트로 이동하기 전에 슬래시 추가
