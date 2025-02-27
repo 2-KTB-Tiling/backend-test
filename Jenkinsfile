@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         DOCKER_HUB_REPO = "luckyprice1103/tiling-backend"
+        GITHUB_CLIENT_ID = credentials('github-client-id')
+        GITHUB_CLIENT_SECRET = credentials('github-client-secret')
         JWT_SECRET = credentials('jwt_secret')
     }
 
@@ -56,7 +58,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker build --build-arg JWT_SECRET=\$JWT_SECRET -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
                     docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
                     """
                 }
