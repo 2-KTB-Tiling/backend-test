@@ -18,7 +18,19 @@ export class AuthController {
   @Post('github')
   @HttpCode(HttpStatus.OK)
   async githubLogin(@Body() loginDto: GithubLoginDto): Promise<AuthResponse> {
-    return await this.authService.loginWithGithub(loginDto.code);
+    console.log('백엔드 GitHub 로그인 요청 수신:');
+    console.log('요청 본문:', loginDto);
+    console.log('인증 코드:', loginDto.code);
+    
+    try {
+      const result = await this.authService.loginWithGithub(loginDto.code);
+      console.log('로그인 성공 응답:', result);
+      return result;
+    } catch (error) {
+      console.error('백엔드 로그인 오류:', error);
+      // 오류를 그대로 던져서 NestJS가 처리하도록 함
+      throw error;
+    }
   }
 
   /**

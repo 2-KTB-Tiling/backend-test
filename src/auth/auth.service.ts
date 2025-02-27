@@ -37,15 +37,21 @@ export class AuthService {
   async loginWithGithub(code: string): Promise<AuthResponse> {
     try {
       // 코드 유효성 검사
-      if (!code) {
-        throw new BadRequestException('GitHub 인증 코드가 필요합니다.', 'invalid_request');
-      }
+    // 코드 유효성 검사
+    if (!code) {
+      console.log('코드 없음 오류');
+      throw new BadRequestException('GitHub 인증 코드가 필요합니다.', 'invalid_request');
+    }
 
       // GitHub OAuth 액세스 토큰 교환
+      console.log('GitHub 토큰 교환 시작');
       const githubToken = await this.exchangeCodeForToken(code);
+      console.log('GitHub 토큰 획득 성공');
       
       // GitHub 사용자 정보 가져오기
+      console.log('GitHub 사용자 정보 요청');
       const githubUser = await this.getGithubUserInfo(githubToken);
+      console.log('GitHub 사용자 정보 획득:', githubUser);
       
       // 사용자 데이터 가공
       const user = {
@@ -90,28 +96,39 @@ export class AuthService {
     try {
       const clientId = this.configService.get<string>('GITHUB_CLIENT_ID');
       const clientSecret = this.configService.get<string>('GITHUB_CLIENT_SECRET');
+      const redirectUri = this.configService.get<string>('GITHUB_CALLBACK_URL');
 
-      const response = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-        }),
-      });
+      console.log('GitHub 토큰 교환 요청 정보:');
+      console.log('클라이언트 ID:', clientId);
+      console.log('리디렉션 URI:', redirectUri);  
+
+
+    // GitHub API 요청
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri, // 이 부분이 중요합니다
+      }),
+    });
 
       const data = await response.json();
+      console.log('GitHub 토큰 교환 응답:', JSON.stringify(data, null, 2));
 
       if (data.error || !data.access_token) {
+        console.error('GitHub 토큰 교환 오류:', data.error_description || data.error);
         throw new UnauthorizedException('GitHub 토큰 교환에 실패했습니다: ' + (data.error_description || data.error), 'invalid_github_code');
       }
 
       return data.access_token;
     } catch (error) {
+      console.error('토큰 교환 오류:', error);
       throw new UnauthorizedException('GitHub 토큰 교환 중 오류가 발생했습니다.', 'invalid_github_code');
     }
   }
@@ -243,5 +260,4 @@ export class AuthService {
   public hasValidGithubToken(userId: number): boolean {
     return this.getGithubToken(userId) !== null;
   }
-  
 }
