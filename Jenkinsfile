@@ -57,7 +57,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker build --build-arg GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID} --build-arg GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker build --build-arg GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID} --build-arg JWT_SECRET=${GITHUB_CLIENT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
                     docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
                     """
                 }
