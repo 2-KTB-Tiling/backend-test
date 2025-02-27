@@ -182,43 +182,7 @@ export class AuthService {
       avatar_url: 'https://github.com/user.png',
     };
   }
-  
-  /**
-   * GitHub 콜백 처리 - 인증 코드를 사용하여 로그인하고 리디렉션 URL 생성
-   * @param code GitHub OAuth 인증 코드
-   * @returns 프론트엔드 리디렉션 URL (토큰 포함)
-   */
-  async handleGithubCallback(code: string): Promise<{ redirectUrl: string }> {
-    try {
-      // 1. GitHub 인증 코드로 로그인 처리
-      const authResult = await this.loginWithGithub(code);
-      
-      // 2. 데이터가 null인지 확인
-      if (!authResult.data) {
-        throw new Error('인증 데이터가 없습니다.');
-      }
-      
-      // 3. 성공 시 프론트엔드 리디렉션 URL 구성
-      const frontendUrl = this.configService.get<string>('frontend.url') || 'http://localhost:3000';
-      const loginSuccessPath = this.configService.get<string>('frontend.loginSuccessPath') || '/login-success';
-      
-      // 4. URL 쿼리 파라미터에 토큰 추가
-      const redirectUrl = `${frontendUrl}${loginSuccessPath}?token=${authResult.data.access_token}&userId=${authResult.data.user.id}`;
-      
-      return { redirectUrl };
-    } catch (error) {
-      // 5. 에러 발생 시 에러 페이지로 리디렉션
-      console.error('GitHub 콜백 처리 오류:', error);
-      
-      const frontendUrl = this.configService.get<string>('frontend.url') || 'http://localhost:3000';
-      const loginErrorPath = this.configService.get<string>('frontend.loginErrorPath') || '/login-error';
-      const errorMessage = encodeURIComponent(error.message || '인증 처리 중 오류가 발생했습니다.');
-      
-      return {
-        redirectUrl: `${frontendUrl}${loginErrorPath}?error=${errorMessage}`,
-      };
-    }
-  }
+
 
   /**
    * 사용자의 GitHub 액세스 토큰을 메모리에 저장
