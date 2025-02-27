@@ -1,9 +1,14 @@
 // src/github/github.service.ts
 import { Injectable, BadRequestException, UnauthorizedException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { Octokit } from 'octokit';
 import { AuthService } from '../auth/auth.service';
 import { Repository, RepositoryStore } from './interfaces/repository.interface';
 import { createDateBasedPath, createDateBasedFilename, createFullDateBasedPath } from '../common/utils/date-path.utils';
+
+// Octokit 동적 import 함수
+async function getOctokitInstance(authToken: string) {
+  const { Octokit } = await import('octokit');
+  return new Octokit({ auth: authToken });
+}
 
 @Injectable()
 export class GithubService {
@@ -115,8 +120,8 @@ export class GithubService {
     }
 
     try {
-      // 3. Octokit 인스턴스 생성
-      const octokit = new Octokit({ auth: githubToken });
+      // 3. Octokit 인스턴스 생성 (동적 import 사용)
+      const octokit = await getOctokitInstance(githubToken);
 
       // 4. 파일 내용 Base64 인코딩
       const contentEncoded = Buffer.from(content).toString('base64');
@@ -197,7 +202,7 @@ export class GithubService {
   ): Promise<{ url: string }> {
     console.log('업로드 요청 - 사용자 ID:', userId);
     // 토큰 저장소 상태 디버깅 (auth.service.ts에 추가했다고 가정)
-    this.authService.debugTokenStore();
+    // this.authService.debugTokenStore(); // 해당 메서드가 없으므로 주석 처리
 
     // 1. GitHub 토큰 가져오기
     const githubToken = this.authService.getGithubToken(userId);
@@ -220,8 +225,8 @@ export class GithubService {
     }
 
     try {
-      // 3. Octokit 인스턴스 생성
-      const octokit = new Octokit({ auth: githubToken });
+      // 3. Octokit 인스턴스 생성 (동적 import 사용)
+      const octokit = await getOctokitInstance(githubToken);
       
       // 4. 경로 생성 (현재 날짜 기준 또는 사용자 지정)
       const date = new Date();
@@ -310,7 +315,7 @@ export class GithubService {
    * @param dirPath 확인할 디렉토리 경로 (예: '2023/Jan/')
    */
   private async ensureDirectoryExists(
-    octokit: Octokit,
+    octokit: any, // Octokit 타입을 any로 변경
     owner: string, 
     repo: string, 
     dirPath: string

@@ -2,8 +2,13 @@
 import { Injectable, UnauthorizedException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Octokit } from 'octokit';
 import { GithubUser, AuthResponse, AuthUserData } from './interfaces/github-user.interface';
+
+async function getOctokitInstance(authToken: string) {
+  const { Octokit } = await import('octokit');  // ✅ 동적 import 사용
+  return new Octokit({ auth: authToken });
+}
+
 
 // 메모리에 토큰을 저장하기 위한 인터페이스
 interface TokenStore {
@@ -118,7 +123,7 @@ export class AuthService {
    */
   private async getGithubUserInfo(token: string): Promise<GithubUser> {
     try {
-      const octokit = new Octokit({ auth: token });
+      const octokit = await getOctokitInstance(token); // ✅ 동적으로 Octokit 인스턴스 생성
       const { data } = await octokit.rest.users.getAuthenticated();
       
       return {
@@ -133,6 +138,7 @@ export class AuthService {
       throw new UnauthorizedException('GitHub 사용자 정보를 가져오는데 실패했습니다.', 'invalid_github_code');
     }
   }
+  
 
   /**
    * 사용자 정보를 기반으로 JWT 토큰을 생성합니다.
