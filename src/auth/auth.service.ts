@@ -3,12 +3,11 @@ import { Injectable, UnauthorizedException, BadRequestException, InternalServerE
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { GithubUser, AuthResponse, AuthUserData } from './interfaces/github-user.interface';
-import { Octokit } from 'octokit';
 
-// async function getOctokitInstance(authToken: string) {
-//   const { Octokit } = await import('octokit');  // ✅ 동적 import 사용
-//   return new Octokit({ auth: authToken });
-// }
+async function getOctokitInstance(authToken: string) {
+  const { Octokit } = await import('octokit');  // ✅ 동적 import 사용
+  return new Octokit({ auth: authToken });
+}
 
 
 // 메모리에 토큰을 저장하기 위한 인터페이스
@@ -147,12 +146,8 @@ export class AuthService {
       console.log('사용자 정보 요청 시작, 토큰:', token.substring(0, 5) + '...');
       console.log('토큰 형식 확인:', token.startsWith('gho_') ? 'OAuth 토큰 형식 맞음' : '토큰 형식 이상');
       
-      // 동기적으로 Octokit 인스턴스 생성
-       // Octokit 인스턴스 생성 시 토큰 형식 명시
-      const octokit = new Octokit({
-        auth: token, // 이미 'gho_'로 시작하는 경우 그대로 사용
-        userAgent: 'tiling-app v1.0'
-    });
+      const { Octokit } = await import('octokit');
+      const octokit = new Octokit({ auth: token });
       const { data } = await octokit.rest.users.getAuthenticated();
       
       // 요청 전 로그
