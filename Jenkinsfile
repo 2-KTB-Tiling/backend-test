@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKER_HUB_REPO = "luckyprice1103/tiling-backend"
-        JWT_SECRET = credentials('jwt-secret')
+        JWT_SECRET = credentials('jwt_secret')
     }
 
     stages {
