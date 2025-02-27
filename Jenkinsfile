@@ -14,7 +14,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/Backend_deploy.git'
+                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/Backend.git'
             }
         }
 
@@ -63,3 +63,6 @@ pipeline {
         }
     }
 }
+
+
+//제킨스 파일
