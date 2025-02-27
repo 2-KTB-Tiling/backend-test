@@ -146,14 +146,22 @@ export class AuthService {
       console.log('사용자 정보 요청 시작, 토큰:', token.substring(0, 5) + '...');
       console.log('토큰 형식 확인:', token.startsWith('gho_') ? 'OAuth 토큰 형식 맞음' : '토큰 형식 이상');
       
-      const { Octokit } = await import('octokit');
-      const octokit = new Octokit({ auth: token });
-      const { data } = await octokit.rest.users.getAuthenticated();
+      // GitHub API 직접 호출
+      const response = await fetch('https://api.github.com/user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'Tiling-App'
+        }
+      });
       
-      // 요청 전 로그
-      console.log('Octokit 인스턴스 생성됨, 사용자 정보 요청 중...');
-
-      // 요청 후 로그
+      if (!response.ok) {
+        throw new Error(`GitHub API 응답 오류: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
       console.log('사용자 정보 응답 받음:', data.login);
       console.log('GitHub 사용자 정보 획득:', {
         id: data.id,
@@ -162,7 +170,7 @@ export class AuthService {
         email: data.email || '',
         avatar_url: data.avatar_url
       });
-
+  
       return {
         id: data.id,
         login: data.login,
@@ -174,10 +182,7 @@ export class AuthService {
     } catch (error) {
       console.error('GitHub 사용자 정보 가져오기 오류:', error);
       console.error('GitHub API 오류 세부정보:', {
-        message: error.message,
-        status: error.status,
-        headers: error.response?.headers,
-        data: error.response?.data
+        message: error.message
       });
       throw new UnauthorizedException('GitHub 사용자 정보를 가져오는데 실패했습니다.', 'invalid_github_code');
     }
