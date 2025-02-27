@@ -65,17 +65,6 @@ pipeline {
             }
         }
 
-        // stage('Build & Push backend Image') {
-        //     steps {
-        //         script {
-        //             sh """
-        //             docker build -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
-        //             docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
-        //             """
-        //         }
-        //     }
-        // }
-
         stage('Update GitHub Deployment YAML') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'github_token', 
