@@ -1,0 +1,106 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_HUB_REPO = "luckyprice1103/tiling-backend"
+        GITHUB_CLIENT_ID = credentials('github-client-id')
+        GITHUB_CLIENT_SECRET = credentials('github-client-secret')
+        JWT_SECRET = credentials('jwt_secret')
+    }
+
+    stages {
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/Backend.git'
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', 
+                    usernameVariable: 'DOCKER_HUB_USERNAME', 
+                    passwordVariable: 'DOCKER_HUB_PASSWORD')]) {
+                    script {
+                        sh 'echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin'
+                    }
+                }
+            }
+        }
+
+        stage('Get Latest Version & Set New Tag') {
+            steps {
+                script {
+                    def latestTag = sh(script: "curl -s https://hub.docker.com/v2/repositories/${DOCKER_HUB_REPO}/tags | jq -r '.results | map(select(.name | test(\"v[0-9]+\\\\.[0-9]+\"))) | sort_by(.last_updated) | .[-1].name'", returnStdout: true).trim()
+                    
+                    def newVersion
+                    if (latestTag == "null" || latestTag == "") {
+                        newVersion = "v1.0"  // 첫 번째 버전
+                    } else {
+                        def versionParts = latestTag.replace("v", "").split("\\.")
+                        def major = versionParts[0].toInteger()
+                        def minor = versionParts[1].toInteger() + 1
+                        newVersion = "v${major}.${minor}"
+                    }
+
+                    env.NEW_TAG = newVersion
+                    echo "New Image Tag: ${NEW_TAG}"
+                }
+            }
+        }
+
+        stage('Build & Push Frontend Image') {
+
+            steps {
+                withCredentials([
+                    string(credentialsId: 'jwt_secret', variable: 'JWT_SECRET'),  // ✅ 정확한 Credentials ID 사용
+                ]) {
+                    withEnv(["JWT_SECRET=${JWT_SECRET}"]) {  // ✅ 보안 문제 해결을 위해 withEnv 사용
+                        sh """
+                        docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                        docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+                        """
+                    }
+                }
+            }
+            
+            // steps {
+            //     script {
+            //         sh """
+            //         docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+            //         docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+            //         """
+            //     }
+            // }
+        }
+
+        stage('Update GitHub Deployment YAML') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github_token', 
+                    usernameVariable: 'GIT_USERNAME', 
+                    passwordVariable: 'GIT_PASSWORD')]) {
+                    script {
+                        sh """
+                        git clone https://github.com/2-KTB-Tiling/k8s-manifests.git
+                        cd k8s-manifests
+                        sed -i 's|image: luckyprice1103/tiling-backend:.*|image: luckyprice1103/tiling-backend:${NEW_TAG}|' backend-deployment.yaml
+                        git config --global user.email "luckyprice1103@naver.com"
+                        git config --global user.name "luckyPrice"
+                        git add backend-deployment.yaml
+                        git commit -m "Update backend image to ${NEW_TAG}"
+                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/2-KTB-Tiling/k8s-manifests.git main
+                        """
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+//젠킨스 파일
