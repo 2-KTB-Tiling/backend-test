@@ -51,27 +51,27 @@ pipeline {
             }
         }
 
-        stage('Build & Push Frontend Image') {
+        // stage('Build & Push Frontend Image') {
 
+        //     steps {
+        //         withCredentials([string(credentialsId: 'jwt_secret', variable: 'JWT_SECRET')]) {
+        //             script {  // ✅ 보안 문제 해결을 위해 withEnv 사용
+        //                 sh """
+        //                 docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+        //                 docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+        //                 """
+        //             }
+        //         }
+        //     }
+            
             steps {
-                withCredentials([string(credentialsId: 'jwt_secret', variable: 'JWT_SECRET')]) {
-                    script {  // ✅ 보안 문제 해결을 위해 withEnv 사용
-                        sh """
-                        docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
-                        docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
-                        """
-                    }
+                script {
+                    sh """
+                    docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+                    """
                 }
             }
-            
-            // steps {
-            //     script {
-            //         sh """
-            //         docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
-            //         docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
-            //         """
-            //     }
-            // }
         }
 
         stage('Update GitHub Deployment YAML') {
