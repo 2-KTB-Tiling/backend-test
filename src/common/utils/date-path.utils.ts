@@ -33,10 +33,13 @@ export function getMonthShortName(monthIndex: number): string {
     const year = date.getFullYear();
     const monthIndex = date.getMonth();
     const monthShort = getMonthShortName(monthIndex);
-    const path = `${year}/${monthShort}/`;
     
-    console.log('생성된 날짜 경로:', path);
-    return path;
+    // 끝에 슬래시를 포함하거나 포함하지 않도록 일관성 있게 유지
+    // 방법 1: 슬래시 포함 (createFullDateBasedPath에서 처리)
+    return `${year}/${monthShort}/`;
+    
+    // 또는 방법 2: 슬래시 미포함
+    // return `${year}/${monthShort}`;
   }
   
   /**
@@ -62,6 +65,11 @@ export function getMonthShortName(monthIndex: number): string {
   export function createFullDateBasedPath(date: Date = new Date()): string {
     const path = createDateBasedPath(date);
     const filename = createDateBasedFilename(date);
-
-    return `${path}/${filename}`;
+    
+    // 경로 끝의 슬래시를 확인하고, 중복 슬래시 방지
+    if (path.endsWith('/')) {
+      return `${path}${filename}`;
+    } else {
+      return `${path}/${filename}`;
+    }
   }

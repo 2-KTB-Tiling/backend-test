@@ -51,29 +51,4 @@ export class AuthController {
     };
   }
   
-  /**
-   * GitHub OAuth 콜백 URL 핸들러
-   * GitHub 인증 후 리디렉션되는 endpoint
-   * @param code GitHub에서 제공하는 인증 코드
-   * @param res Express Response 객체
-   */
-  @Get('github/callback')
-  async githubCallback(@Query('code') code: string, @Res() res: Response) {
-    try {
-      // 1. 인증 코드 유효성 검사
-      if (!code) {
-        throw new BadRequestException('GitHub 인증 코드가 필요합니다.', 'invalid_request');
-      }
-      
-      // 2. 서비스를 통해 GitHub 콜백 처리
-      const { redirectUrl } = await this.authService.handleGithubCallback(code);
-      
-      // 3. 프론트엔드 페이지로 리디렉션 (토큰 포함)
-      return res.redirect(redirectUrl);
-    } catch (error) {
-      // 4. 에러 발생 시 로깅 및 에러 페이지로 리디렉션
-      console.error('GitHub 콜백 처리 오류:', error);
-      return res.redirect('http://localhost:3000/login-error?error=인증_처리_중_오류가_발생했습니다');
-    }
-  }
 }
