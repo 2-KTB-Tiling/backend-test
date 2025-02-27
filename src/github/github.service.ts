@@ -201,9 +201,9 @@ export class GithubService {
     commitMessage: string = 'Add TIL via TIL Converter'
   ): Promise<{ url: string }> {
     console.log('업로드 요청 - 사용자 ID:', userId);
-    // 토큰 저장소 상태 디버깅 (auth.service.ts에 추가했다고 가정)
-    // this.authService.debugTokenStore(); // 해당 메서드가 없으므로 주석 처리
-
+    // 토큰 저장소 상태 디버깅
+    this.authService.debugTokenStore();
+    
     // 1. GitHub 토큰 가져오기
     const githubToken = this.authService.getGithubToken(userId);
 

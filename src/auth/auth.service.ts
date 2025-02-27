@@ -3,11 +3,12 @@ import { Injectable, UnauthorizedException, BadRequestException, InternalServerE
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { GithubUser, AuthResponse, AuthUserData } from './interfaces/github-user.interface';
+import { Octokit } from 'octokit';
 
-async function getOctokitInstance(authToken: string) {
-  const { Octokit } = await import('octokit');  // ✅ 동적 import 사용
-  return new Octokit({ auth: authToken });
-}
+// async function getOctokitInstance(authToken: string) {
+//   const { Octokit } = await import('octokit');  // ✅ 동적 import 사용
+//   return new Octokit({ auth: authToken });
+// }
 
 
 // 메모리에 토큰을 저장하기 위한 인터페이스
@@ -140,9 +141,27 @@ export class AuthService {
    */
   private async getGithubUserInfo(token: string): Promise<GithubUser> {
     try {
-      const octokit = await getOctokitInstance(token); // ✅ 동적으로 Octokit 인스턴스 생성
+      // 토큰 형식 확인 및 로깅
+      console.log('사용자 정보 요청 시작, 토큰:', token.substring(0, 5) + '...');
+      console.log('토큰 형식 확인:', token.startsWith('gho_') ? 'OAuth 토큰 형식 맞음' : '토큰 형식 이상');
+      
+      // 동기적으로 Octokit 인스턴스 생성
+      const octokit = new Octokit({ auth: token });
       const { data } = await octokit.rest.users.getAuthenticated();
       
+      // 요청 전 로그
+      console.log('Octokit 인스턴스 생성됨, 사용자 정보 요청 중...');
+
+      // 요청 후 로그
+      console.log('사용자 정보 응답 받음:', data.login);
+      console.log('GitHub 사용자 정보 획득:', {
+        id: data.id,
+        login: data.login,
+        name: data.name || data.login,
+        email: data.email || '',
+        avatar_url: data.avatar_url
+      });
+
       return {
         id: data.id,
         login: data.login,
@@ -152,6 +171,13 @@ export class AuthService {
         html_url: data.html_url,
       };
     } catch (error) {
+      console.error('GitHub 사용자 정보 가져오기 오류:', error);
+      console.error('GitHub API 오류 세부정보:', {
+        message: error.message,
+        status: error.status,
+        headers: error.response?.headers,
+        data: error.response?.data
+      });
       throw new UnauthorizedException('GitHub 사용자 정보를 가져오는데 실패했습니다.', 'invalid_github_code');
     }
   }
