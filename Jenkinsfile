@@ -3,9 +3,6 @@ pipeline {
 
     environment {
         DOCKER_HUB_REPO = "luckyprice1103/tiling-backend"
-        GITHUB_CLIENT_ID = credentials('github-client-id')
-        GITHUB_CLIENT_SECRET = credentials('github-client-secret')
-        JWT_SECRET = credentials('jwt_secret')
     }
 
     stages {
@@ -62,7 +59,7 @@ pipeline {
                 ]) {
                     withEnv(["JWT_SECRET=${JWT_SECRET}"]) {  // ✅ 보안 문제 해결을 위해 withEnv 사용
                         sh """
-                        docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                        docker build --build-arg JJWT_SECRET="\$JWT_SECRET" -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
                         docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
                         """
                     }
