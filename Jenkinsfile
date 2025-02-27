@@ -30,45 +30,12 @@ pipeline {
             }
         }
 
-        stage('Get Latest Version & Set New Tag') {
-            steps {
-                script {
-                    def latestTag = sh(script: "curl -s https://hub.docker.com/v2/repositories/${DOCKER_HUB_REPO}/tags | jq -r '.results | map(select(.name | test(\"v[0-9]+\\\\.[0-9]+\"))) | sort_by(.last_updated) | .[-1].name'", returnStdout: true).trim()
-                    
-                    def newVersion
-                    if (latestTag == "null" || latestTag == "") {
-                        newVersion = "v1.0"  // 첫 번째 버전
-                    } else {
-                        def versionParts = latestTag.replace("v", "").split("\\.")
-                        def major = versionParts[0].toInteger()
-                        def minor = versionParts[1].toInteger() + 1
-                        newVersion = "v${major}.${minor}"
-                    }
-
-                    env.NEW_TAG = newVersion
-                    echo "New Image Tag: ${NEW_TAG}"
-                }
-            }
-        }
-
-        // stage('Build & Push Frontend Image') {
-
-        //     steps {
-        //         withCredentials([string(credentialsId: 'jwt_secret', variable: 'JWT_SECRET')]) {
-        //             script {  // ✅ 보안 문제 해결을 위해 withEnv 사용
-        //                 sh """
-        //                 docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
-        //                 docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
-        //                 """
-        //             }
-        //         }
-        //     }
-            
+        stage('Build & Push Backend Image') {
             steps {
                 script {
                     sh """
-                    docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
-                    docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+                    docker build -t ${DOCKER_HUB_REPO}:latest -f Dockerfile .
+                    docker push ${DOCKER_HUB_REPO}:latest
                     """
                 }
             }
@@ -95,6 +62,4 @@ pipeline {
             }
         }
     }
-
-
-//젠킨스 파일
+}
