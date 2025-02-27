@@ -146,7 +146,11 @@ export class AuthService {
       console.log('토큰 형식 확인:', token.startsWith('gho_') ? 'OAuth 토큰 형식 맞음' : '토큰 형식 이상');
       
       // 동기적으로 Octokit 인스턴스 생성
-      const octokit = new Octokit({ auth: token });
+       // Octokit 인스턴스 생성 시 토큰 형식 명시
+      const octokit = new Octokit({
+        auth: token, // 이미 'gho_'로 시작하는 경우 그대로 사용
+        userAgent: 'tiling-app v1.0'
+    });
       const { data } = await octokit.rest.users.getAuthenticated();
       
       // 요청 전 로그
