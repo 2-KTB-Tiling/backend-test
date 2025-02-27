@@ -76,6 +76,8 @@ export class AuthService {
         },
       };
     } catch (error) {
+      console.error('로그인 오류 전체 정보:', error);
+      
       if (error instanceof BadRequestException) {
         throw error;
       } else if (error.message.includes('GitHub')) {
@@ -140,8 +142,17 @@ export class AuthService {
    */
   private async getGithubUserInfo(token: string): Promise<GithubUser> {
     try {
+      console.log('사용자 정보 요청 시작, 토큰:', token.substring(0, 5) + '...');
+
       const octokit = await getOctokitInstance(token); // ✅ 동적으로 Octokit 인스턴스 생성
+
+      // 요청 전 로그
+      console.log('Octokit 인스턴스 생성됨, 사용자 정보 요청 중...');
+
       const { data } = await octokit.rest.users.getAuthenticated();
+
+       // 요청 후 로그
+      console.log('사용자 정보 응답 받음:', data.login);
       
       return {
         id: data.id,
@@ -152,6 +163,7 @@ export class AuthService {
         html_url: data.html_url,
       };
     } catch (error) {
+      console.error('GitHub 사용자 정보 가져오기 오류:', error);
       throw new UnauthorizedException('GitHub 사용자 정보를 가져오는데 실패했습니다.', 'invalid_github_code');
     }
   }
