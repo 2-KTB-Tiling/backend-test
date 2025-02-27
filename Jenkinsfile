@@ -56,7 +56,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker build --build-arg JWT_SECRET=${JWT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
                     docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
                     """
                 }
