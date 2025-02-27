@@ -14,7 +14,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/Backend.git'
+                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/backend-test.git'
             }
         }
 
@@ -30,16 +30,51 @@ pipeline {
             }
         }
 
-        stage('Build & Push Backend Image') {
+        stage('Get Latest Version & Set New Tag') {
             steps {
                 script {
-                    sh """
-                    docker build -t ${DOCKER_HUB_REPO}:latest -f Dockerfile .
-                    docker push ${DOCKER_HUB_REPO}:latest
-                    """
+                    def latestTag = sh(script: "curl -s https://hub.docker.com/v2/repositories/${DOCKER_HUB_REPO}/tags | jq -r '.results | map(select(.name | test(\"v[0-9]+\\\\.[0-9]+\"))) | sort_by(.last_updated) | .[-1].name'", returnStdout: true).trim()
+                    
+                    def newVersion
+                    if (latestTag == "null" || latestTag == "") {
+                        newVersion = "v1.0"  // 첫 번째 버전
+                    } else {
+                        def versionParts = latestTag.replace("v", "").split("\\.")
+                        def major = versionParts[0].toInteger()
+                        def minor = versionParts[1].toInteger() + 1
+                        newVersion = "v${major}.${minor}"
+                    }
+
+                    env.NEW_TAG = newVersion
+                    echo "New Image Tag: ${NEW_TAG}"
                 }
             }
         }
+        
+        stage('Build & Push backend Image') {
+            steps {
+                withCredentials([file(credentialsId: 'back-key', variable: 'SECRET_ENV')]) {
+                    script {
+                        sh """
+                        cp $SECRET_ENV .env
+                        docker build -t ${DOCKER_HUB_REPO}:${NEW_TAG} --build-arg ENV_FILE=.env -f Dockerfile .
+                        docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
+        // stage('Build & Push backend Image') {
+        //     steps {
+        //         script {
+        //             sh """
+        //             docker build -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+        //             docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+        //             """
+        //         }
+        //     }
+        // }
 
         stage('Update GitHub Deployment YAML') {
             steps {
