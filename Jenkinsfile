@@ -14,7 +14,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/Backend.git'
+                git branch: 'main', credentialsId: 'github_token', url: 'https://github.com/2-KTB-Tiling/backend-test.git'
             }
         }
 
@@ -51,12 +51,12 @@ pipeline {
             }
         }
 
-        stage('Build & Push Backend Image') {
+        stage('Build & Push backend Image') {
             steps {
                 script {
                     sh """
-                    docker build -t ${DOCKER_HUB_REPO}:latest -f Dockerfile .
-                    docker push ${DOCKER_HUB_REPO}:latest
+                    docker build -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
                     """
                 }
             }
