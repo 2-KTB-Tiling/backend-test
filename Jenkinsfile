@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         DOCKER_HUB_REPO = "luckyprice1103/tiling-backend"
+        GITHUB_CLIENT_ID = credentials('github-client-id')
+        GITHUB_CLIENT_SECRET = credentials('github-client-secret')
     }
 
     stages {
@@ -55,7 +57,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker build -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker build --build-arg GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID} --build-arg GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET} -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
                     docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
                     """
                 }
