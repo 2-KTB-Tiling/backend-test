@@ -74,10 +74,10 @@ pipeline {
                         sh """
                         git clone https://github.com/2-KTB-Tiling/k8s-manifests.git
                         cd k8s-manifests
-                        sed -i 's|image: luckyprice1103/tiling-backend:.*|image: luckyprice1103/tiling-backend:${NEW_TAG}|' backend-deployment.yaml
+                        sed -i 's|image: luckyprice1103/tiling-backend:.*|image: luckyprice1103/tiling-backend:${NEW_TAG}|' deployment.yaml
                         git config --global user.email "luckyprice1103@naver.com"
                         git config --global user.name "luckyPrice"
-                        git add backend-deployment.yaml
+                        git add deployment.yaml
                         git commit -m "Update frontend image to ${NEW_TAG}"
                         git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/2-KTB-Tiling/k8s-manifests.git main
                         """
