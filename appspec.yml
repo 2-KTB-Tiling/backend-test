@@ -13,6 +13,9 @@ hooks:
     - location: scripts/install_dependencies.sh
       timeout: 300
       runas: ubuntu
+    - location: scripts/set_env.sh  # ✅ NEW_TAG 환경 변수 저장 스크립트 추가
+      timeout: 300
+      runas: ubuntu
   ApplicationStart:
     - location: scripts/start_container.sh
       timeout: 300

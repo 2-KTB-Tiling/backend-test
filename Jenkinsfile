@@ -74,6 +74,7 @@ pipeline {
                 script {
                     sh """
                     echo "📦 배포 패키지 압축 중..."
+                    echo "NEW_TAG=${NEW_TAG}" > scripts/.deploy_env
                     zip -r deployment.zip appspec.yml scripts/
                     aws s3 cp deployment.zip s3://${S3_BUCKET}/backend.zip
                     echo "✅ 배포 패키지 S3 업로드 완료"
