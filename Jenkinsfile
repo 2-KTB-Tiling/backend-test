@@ -3,6 +3,10 @@ pipeline {
 
     environment {
         DOCKER_HUB_REPO = "luckyprice1103/tiling-backend"
+        S3_BUCKET = "my-deployment-bucket"
+        AWS_REGION = "ap-northeast-2"
+        CODEDEPLOY_APP = "TIL-project"
+        CODEDEPLOY_GROUP = "TIL-deploy-group"
     }
 
     stages {
