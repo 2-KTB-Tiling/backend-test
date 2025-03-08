@@ -2,21 +2,22 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ubuntu  # ✅ 배포 경로 수정
+    destination: /home/ubuntu/backend/  # ✅ 백엔드 전용 폴더로 변경
 
 hooks:
   ApplicationStop:
-    - location: scripts/stop_container.sh
+    - location: backend/scripts/stop_container.sh
       timeout: 300
       runas: ubuntu
   BeforeInstall:
-    - location: scripts/install_dependencies.sh
+    - location: backend/scripts/install_dependencies.sh
       timeout: 300
       runas: ubuntu
-    - location: scripts/set_env.sh  # ✅ NEW_TAG 환경 변수 저장 스크립트 추가
+    - location: backend/scripts/set_env.sh
       timeout: 300
       runas: ubuntu
   ApplicationStart:
-    - location: scripts/start_container.sh
+    - location: backend/scripts/start_container.sh
       timeout: 300
       runas: ubuntu
+
