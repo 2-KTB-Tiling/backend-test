@@ -75,7 +75,7 @@ pipeline {
                     sh """
                     echo "📦 배포 패키지 압축 중..."
                     zip -r deployment.zip appspec.yml scripts/
-                    aws s3 cp deployment.zip s3://${S3_BUCKET}/deployment.zip
+                    aws s3 cp deployment.zip s3://${S3_BUCKET}/backend.zip
                     echo "✅ 배포 패키지 S3 업로드 완료"
                     """
                 }
@@ -90,7 +90,7 @@ pipeline {
                     aws deploy create-deployment \
                         --application-name ${CODEDEPLOY_APP} \
                         --deployment-group-name ${CODEDEPLOY_GROUP} \
-                        --s3-location bucket=${S3_BUCKET},bundleType=zip,key=deployment.zip
+                        --s3-location bucket=${S3_BUCKET},bundleType=zip,key=backend.zip
                     echo "✅ CodeDeploy 배포 요청 완료"
                     """
                 }
