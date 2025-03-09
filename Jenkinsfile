@@ -79,8 +79,10 @@ pipeline {
                     ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa ubuntu@${DEPLOY_SERVER} << EOF
                     echo "✅ SSH 접속 완료!"
 
-                    # 🔹 환경 변수 설정
-                    echo "NEW_TAG=${newTag}" | sudo tee /home/ubuntu/.env
+                    # 🔹 버전 업데이트
+                    grep -q "^NEW_TAG_BACKEND=" /home/ubuntu/.env && \
+                        sudo sed -i "s/^NEW_TAG_BACKEND=.*/NEW_TAG_BACKEND=${newTag}/" /home/ubuntu/.env || \
+                        echo "NEW_TAG_BACKEND=${newTag}" | sudo tee -a /home/ubuntu/.env
 
                     # 🔹 최신 이미지 Pull
                     sudo docker pull luckyprice1103/tiling-backend:${newTag}
