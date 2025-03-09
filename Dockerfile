@@ -1,37 +1,22 @@
+# 1. Node.js 18 버전 사용
+FROM node:18
 
-FROM node:18-alpine AS builder
+# 2. 작업 디렉토리 설정
 WORKDIR /app
 
-# 패키지 설치
+# 3. package.json 및 package-lock.json 복사 후 의존성 설치
 COPY package.json package-lock.json ./
 RUN npm install
 
-# 소스 코드 복사
-COPY . .
-
-# 환경 변수 파일 복사 (Jenkins에서 제공)
+# 4. 환경 변수 파일 복사 (Jenkins에서 제공)
 ARG ENV_FILE
 COPY ${ENV_FILE} .env
 
-# 빌드 실행
-RUN npm run build
+# 5. 모든 소스 코드 복사
+COPY . .
 
-
-FROM node:18-alpine
-WORKDIR /app
-
-# 빌드된 파일 복사
-COPY --from=builder /app/dist ./dist
-COPY package.json ./
-
-# 프로덕션 패키지만 설치
-RUN npm install --only=production
-
-# 환경 변수 파일 복사
-COPY --from=builder /app/.env .env
-
-# 포트 설정
+# 6. 포트 설정 (기본 3000번)
 EXPOSE 3000
 
-# 실행 명령
-CMD ["node", "dist/main"]
+# 7. 실행 명령어 (NestJS 앱 실행)
+CMD ["npm", "run", "start"]
