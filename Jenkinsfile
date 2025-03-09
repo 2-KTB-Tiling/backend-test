@@ -69,30 +69,32 @@ pipeline {
             }
         }
 
-        stage('Create Deployment Package') {
+       stage('Deploy to EC2 with Docker Compose') {
             steps {
                 script {
-                    sh """
-                    echo "📦 배포 패키지 압축 중..."
-                    echo "NEW_TAG=${NEW_TAG}" > scripts/.deploy_env
-                    zip -r deployment.zip appspec.yml scripts/
-                    aws s3 cp deployment.zip s3://${S3_BUCKET}/backend.zip
-                    echo "✅ 배포 패키지 S3 업로드 완료"
-                    """
-                }
-            }
-        }
+                    def newTag = env.NEW_TAG  // ✅ NEW_TAG 값 가져오기
 
-        stage('Trigger CodeDeploy') {
-            steps {
-                script {
                     sh """
-                    echo "🚀 AWS CodeDeploy 배포 시작..."
-                    aws deploy create-deployment \
-                        --application-name ${CODEDEPLOY_APP} \
-                        --deployment-group-name ${CODEDEPLOY_GROUP} \
-                        --s3-location bucket=${S3_BUCKET},bundleType=zip,key=backend.zip
-                    echo "✅ CodeDeploy 배포 요청 완료"
+                    echo "🚀 배포 서버에 Docker Compose 적용 중..."
+                    echo "🔹 배포할 버전: ${newTag}"
+
+                    # 🔹 SSH 접속하여 Docker Compose 배포 실행
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa ubuntu@${DEPLOY_SERVER} << EOF
+                    echo "✅ SSH 접속 완료!"
+
+                    # 🔹 환경 변수 설정
+                    echo "NEW_TAG=${newTag}" | sudo tee /home/ubuntu/.env
+
+                    # 🔹 최신 이미지 Pull
+                    sudo docker pull luckyprice1103/tiling-backend:${newTag}
+
+                    # 🔹 기존 컨테이너 종료
+                    sudo docker-compose -f /home/ubuntu/docker-compose.yml down
+
+                    # 🔹 최신 버전으로 컨테이너 실행
+                    sudo docker-compose --env-file /home/ubuntu/.env -f /home/ubuntu/docker-compose.yml up -d
+                    echo "✅ Docker 백앤드 배포 완료!!"
+                    << EOF
                     """
                 }
             }
